@@ -54,7 +54,7 @@ HighestSteps<- dataByInterval[dataByInterval$steps==max(dataByInterval$steps), ]
 print(paste0("The maximum average number of steps are ", round(HighestSteps,2), " and these are typically taken at the interval identifier ", HighestStepsInt ," in this 2 month period." ))
 ```
 
-3. Imputing missing values
+4. Imputing missing values
 
 To avoid any bias into some calculations or summaries of the data due to missing values, this code chunk looks at replacing the missing values with the values for that category of data.
 
@@ -85,7 +85,7 @@ print("The difference in the imputed and original data is significant as seen in
 ggplot(datamergemelt, aes(x=value)) + geom_histogram(binwidth=250)+xlab("")+ facet_grid(. ~ variable)
 ```                                                                                                                          
 
-4. Activity comparison by weekend and weekdays
+5. Activity comparison by weekend and weekdays
 
 This chunk of code looks at the variation of average steps in a given interval by the type of day, i.e. weekday or weekend. 
     
