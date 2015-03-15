@@ -1,0 +1,106 @@
+---
+title: "Personal activity monitoring device data"
+output: html_document
+---
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the "quantified self" movement -- a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. 
+
+This assignment makes use of data from such a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+    Dataset: Activity monitoring data [52K]
+    Variables:
+      steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+      date: The date on which the measurement was taken in YYYY-MM-DD format
+      interval: Identifier for the 5-minute interval in which measurement was taken
+    Total observations:17,568
+    
+Data Analysis
+
+1. Loading and preprocessing the data
+
+This chunk of code loads the data and does initial pre-processing on it to remove the N/A values and and converting date into a factor variable.
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+
+if(!file.exists("./data")){dir.create("./data")}
+unzip(zipfile="./repdata_data_activity.zip",exdir="./data")
+files<-list.files("./data", recursive=TRUE)
+datafile<- read.csv("./data/activity.csv")
+datafile<- datafile [!is.na(datafile$steps), ]
+datafile[ ,2] <- factor(as.character(datafile[ ,2]))
+```
+2. Relationship of average number of steps taken and day of measurement
+
+This chunk of code looks at the total steps by date, and reports the Mean and Median of the total number of steps as a function of date.
+
+```{r}
+dataByDay<- aggregate(steps ~ date, data=datafile, FUN=sum)
+ggplot(dataByDay, aes(x=steps))+geom_histogram(binwidth=250)+ggtitle("Variation in Total Steps by Day")+ xlab("Number of steps")
+print(paste0(round(mean(dataByDay$steps),2)," is the mean number of total daily steps across all days of measurements."))
+print(paste0(round(median(dataByDay$steps),2)," is the median of total daily steps across all days of measurements."))
+```
+
+3. Variation in average steps by 5-minute intervals
+
+This chunk of code looks at the average number of steps by the intervals averaged across all days, and determines which 5 minute interval across all days has the maximum number of steps. 
+
+```{r}
+dataByInterval<- aggregate(steps ~ interval, data=datafile, FUN=mean)
+ggplot(dataByInterval, aes(x=interval, y=steps))+geom_line()+ggtitle("Average steps across all days by interval ")+xlab("Interval identifier")
+HighestStepsInt<- dataByInterval[dataByInterval$steps==max(dataByInterval$steps), ]$interval
+HighestSteps<- dataByInterval[dataByInterval$steps==max(dataByInterval$steps), ]$steps
+print(paste0("The maximum average number of steps are ", round(HighestSteps,2), " and these are typically taken at the interval identifier ", HighestStepsInt ," in this 2 month period." ))
+```
+
+3. Imputing missing values
+
+To avoid any bias into some calculations or summaries of the data due to missing values, this code chunk looks at replacing the missing values with the values for that category of data.
+
+First the total number of missing values in the dataset (i.e. the total number of rows with NAs) are calculated.
+Then the missing value of steps for a given observation is replaced by the average steps for that interval across the two month interval. 
+The new imputed dataset is created and a histogram of the total number of steps for each day is plotted. Also the mean and median total number of steps taken per day are reported. The impact of imputation is then accessed for this data set.
+
+```{r}
+datafileraw<- read.csv("./data/activity.csv")
+datafileRmNa<- datafileraw [!is.na(datafileraw$steps), ]
+MeanByinterval<- aggregate(steps ~ interval, data=datafileraw, FUN=mean)
+NumRowsMissing<- length(datafileraw$steps)-length(datafileRmNa$steps)
+for (i in 1:length(datafileraw$steps)){ if (is.na(datafileraw[i,1])) {datafileraw[i,1]<- MeanByinterval[which(MeanByinterval$interval==datafileraw[i, 3]), 2]} }
+                                          
+dataByDayImputed<- aggregate(steps ~ date, data=datafileraw, FUN=sum)
+ggplot(dataByDayImputed, aes(x=steps))+geom_histogram(binwidth=250)+ggtitle("Variation in Total Steps by Day (Imputed data)")+ xlab("Number of steps")
+StepsMeanImputed<- mean(dataByDayImputed$steps)
+StepsMedianImputed <- median(dataByDayImputed$steps)
+print(paste0("The mean of total steps by day does not change much with imputation of the data. This value before imputation was ", round(mean(dataByDay$steps),2) ," and after imputation is also ", round(mean(dataByDayImputed$steps),2) ))
+print(paste0("The median of total steps by day changes (very slightly) with imputation. This value before imputation was ",round(median(dataByDay$steps),2) ," and after imputation is ",round(median(dataByDayImputed$steps),2) ))
+
+
+colnames(dataByDayImputed)<- c("date", "# of Steps-Imputed data")
+colnames(dataByDay)<- c("date", "# of Steps-Original data")
+datamerged <- left_join(dataByDayImputed, dataByDay, by="date")
+datamergemelt <- melt(datamerged)
+print("The difference in the imputed and original data is significant as seen in the graph below:")
+ggplot(datamergemelt, aes(x=value)) + geom_histogram(binwidth=250)+xlab("")+ facet_grid(. ~ variable)
+```                                                                                                                          
+
+4. Activity comparison by weekend and weekdays
+
+This chunk of code looks at the variation of average steps in a given interval by the type of day, i.e. weekday or weekend. 
+    
+For achieving this, a new factor variable is created in the dataset with two levels -- "weekday" and "weekend" indicating whether a given date is a weekday or weekend day. Thereafter, a panel plot is created containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+
+```{r}
+dayType<-as.POSIXlt(as.character(datafileraw$date))$wday
+for (i in 1:length(dayType)){if (dayType[i] %in% c(1,2,3,4,5)){dayType[i]<-"Weekday"} else {dayType[i]<- "Weekend"}}
+datafileraw<- cbind.data.frame(datafileraw, dayType)     
+
+dataByDayIntdayT<- aggregate(x=datafileraw$steps, by=list(datafileraw$interval, datafileraw$dayType), FUN="mean")
+colnames(dataByDayIntdayT)<- c("Interval", "DayType", "AverageSteps")
+p <- ggplot(dataByDayIntdayT, aes(x=Interval, y=AverageSteps)) + geom_line()
+p + facet_grid(DayType ~ .)
+```
+
+
+ 
